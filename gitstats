@@ -1000,7 +1000,7 @@ class HTMLReportCreator(ReportCreator):
 		lastMonth = now + dateutil.relativedelta.relativedelta(months=-1)
 		nowStr=now.strftime("%Y-%m-%d")
 		lastMonthStr=lastMonth.strftime("%Y-%m-%d")
-		dateStr=nowStr+"-"+lastMonthStr
+		dateStr=lastMonthStr+"-"+nowStr
 		for author in data.getAuthorsMonth(conf['max_authors']):
 			info = data.getAuthorMonthInfo(author)
 			f.write('<tr><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%d</td></tr>' % (dateStr, author, info['commits'], info['lines_added'], info['lines_removed']))
