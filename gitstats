@@ -13,6 +13,7 @@ import subprocess
 import sys
 import time
 import zlib
+import dateutil.relativedelta
 
 if sys.version_info < (2, 6):
 	print >> sys.stderr, "Python 2.6 or higher is required for gitstats"
@@ -150,7 +151,7 @@ class DataCollector:
 
 		self.authors = {} # name -> {commits, first_commit_stamp, last_commit_stamp, last_active_day, active_days, lines_added, lines_removed}
 		# by leih
-		self.authors_of_month = {} # month -> name -> {commits, lines_added, lines_removed}
+		self.authors_of_month = {} # name -> {commits, lines_added, lines_removed}
 
 		self.total_commits = 0
 		self.total_files = 0
@@ -619,14 +620,13 @@ class GitDataCollector(DataCollector):
 
 						# by leih
 						date = datetime.datetime.fromtimestamp(stamp)
-						yymm = date.strftime('%Y-%m')
-						if yymm not in self.authors_of_month:
-							self.authors_of_month[yymm] = {}
-						if author not in self.authors_of_month[yymm]:
-							self.authors_of_month[yymm][author] = { 'lines_added' : 0, 'lines_removed' : 0, 'commits' : 0}
-						self.authors_of_month[yymm][author]['commits'] = self.authors_of_month[yymm][author].get('commits', 0) + 1
-						self.authors_of_month[yymm][author]['lines_added'] = self.authors_of_month[yymm][author].get('lines_added', 0) + inserted
-						self.authors_of_month[yymm][author]['lines_removed'] = self.authors_of_month[yymm][author].get('lines_removed', 0) + deleted
+						lastMonth = datetime.datetime.now() + dateutil.relativedelta.relativedelta(months=-1)
+						if date>lastMonth:
+							if author not in self.authors_of_month:
+								self.authors_of_month[author] = { 'lines_added' : 0, 'lines_removed' : 0, 'commits' : 0}
+							self.authors_of_month[author]['commits'] = self.authors_of_month[author].get('commits', 0) + 1
+							self.authors_of_month[author]['lines_added'] = self.authors_of_month[author].get('lines_added', 0) + inserted
+							self.authors_of_month[author]['lines_removed'] = self.authors_of_month[author].get('lines_removed', 0) + deleted
 
 						if stamp not in self.changes_by_date_by_author:
 							self.changes_by_date_by_author[stamp] = {}
@@ -680,16 +680,16 @@ class GitDataCollector(DataCollector):
 	def getAuthorInfo(self, author):
 		return self.authors[author]
 
-	def getAuthorMonthInfo(self, month, author):
-		return self.authors_of_month[month][author]
+	def getAuthorMonthInfo(self, author):
+		return self.authors_of_month[author]
 	
 	def getAuthors(self, limit = None):
 		res = getkeyssortedbyvaluekey(self.authors, 'commits')
 		res.reverse()
 		return res[:limit]
 
-	def getAuthorsMonth(self, month, limit = None):
-		res = getkeyssortedbyvaluekey(self.authors_of_month[month], 'commits')
+	def getAuthorsMonth(self, limit = None):
+		res = getkeyssortedbyvaluekey(self.authors_of_month, 'commits')
 		res.reverse()
 		return res[:limit]
 	
@@ -994,12 +994,16 @@ class HTMLReportCreator(ReportCreator):
 		# Authors :: authors of month
 		# by leih
 		f.write(html_header(2, 'authors of month'))
-		yymm = datetime.datetime.today().strftime('%Y-%m')
 		f.write('<table class="authors sortable" id="authors of month">')
-		f.write('<tr><th>Author</th><th>Commits (%)</th><th>+ lines</th><th>- lines</th></tr>')
-		for author in data.getAuthorsMonth(yymm, conf['max_authors']):
-			info = data.getAuthorMonthInfo(yymm, author)
-			f.write('<tr><td>%s</td><td>%d</td><td>%d</td><td>%d</td></tr>' % (author, info['commits'], info['lines_added'], info['lines_removed']))
+		f.write('<tr><th>Date</th><th>Author</th><th>Commits (%)</th><th>+ lines</th><th>- lines</th></tr>')
+		now = datetime.datetime.now()
+		lastMonth = now + dateutil.relativedelta.relativedelta(months=-1)
+		nowStr=now.strftime("%Y-%m-%d")
+		lastMonthStr=lastMonth.strftime("%Y-%m-%d")
+		dateStr=nowStr+"-"+lastMonthStr
+		for author in data.getAuthorsMonth(conf['max_authors']):
+			info = data.getAuthorMonthInfo(author)
+			f.write('<tr><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%d</td></tr>' % (dateStr, author, info['commits'], info['lines_added'], info['lines_removed']))
 		f.write('</table>')
 
 		allauthors = data.getAuthors()
